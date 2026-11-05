@@ -116,7 +116,25 @@ const download=(name,contents,type)=>{const a=document.createElement('a'),u=URL.
 $('backup').onclick=()=>download('aureon-brindes-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(data,null,2),'application/json');
 $('exportCSV').onclick=()=>{const rows=[['Data','Estabelecimento','Captador','Equipe','Categoria','Descrição','Quantidade','Valor unitário','Total','Situação','Casal','Venda ativa','Venda cancelada'],...filtered().map(c=>[c.date,nameOf('partners',c.partnerId),nameOf('captadores',c.captadorId),data.captadores.find(x=>x.id===c.captadorId)?.team||'',c.category,c.description,c.qty,c.unit,c.qty*c.unit,c.status,c.couple||0,c.sale||0,c.cancelled||0])];download('aureon-brindes-'+($('month').value||'todos')+'.csv','\ufeff'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n'),'text/csv;charset=utf-8')};
 $('importBtn').onclick=()=>$('importFile').click();
-$('importFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const p=JSON.parse(await file.text());if(!p||!['partners','captadores','costs'].every(k=>Array.isArray(p[k])))throw Error('Formato inválido');if(!confirm('Este backup substituirá TODOS os dados locais atuais. Continuar?'))return;data=p;save()}catch(err){alert('Arquivo de backup inválido: '+err.message)}e.target.value=''};
+$('importFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{
+const p=JSON.parse(await file.text());
+if(!p||!['partners','captadores','costs'].every(k=>Array.isArray(p[k])))throw Error('Formato inválido');
+if(!confirm('Este backup substituirá TODOS os dados locais atuais. Uma cópia de segurança será criada antes da restauração. Continuar?'))return;
+const previous=localStorage.getItem(KEY);
+const snapshotKey=KEY+'-antes-restauracao';
+if(previous!==null){
+// Não prosseguir se o navegador não conseguir guardar a cópia de segurança.
+localStorage.setItem(snapshotKey,previous);
+if(localStorage.getItem(snapshotKey)!==previous)throw Error('Não foi possível verificar a cópia de segurança');
+download('aureon-brindes-antes-restauracao-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json',previous,'application/json');
+}
+const next=JSON.stringify(p);
+try{localStorage.setItem(KEY,next)}catch(err){
+if(previous!==null)localStorage.setItem(KEY,previous);
+throw Error('Falha ao gravar o backup importado; os dados anteriores foram preservados');
+}
+data=p;render();toast('Backup restaurado. Cópia anterior preservada neste navegador');
+}catch(err){alert('Restauração não realizada: '+err.message)}finally{e.target.value=''}};
 
 $('importTS').onclick=()=>$('tsFile').click();
 $('tsFile').onchange=async e=>{
