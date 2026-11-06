@@ -39,8 +39,41 @@ const KEY='aureon-brindes-v1',categories=['Restaurante','Passeio turístico','Ch
 const $=id=>document.getElementById(id),money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const newId=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2);
 let data={partners:[],captadores:[],costs:[]};
-try{const p=JSON.parse(localStorage.getItem(KEY)||'null');if(p&&['partners','captadores','costs'].every(k=>Array.isArray(p[k])))data=p}catch(e){alert('Não foi possível ler dados salvos. Restaure um backup se necessário.')}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(data));render();toast('Registro salvo neste dispositivo')}catch(e){alert('Não foi possível salvar. Verifique o espaço do navegador e faça backup.')}};
+let storageBlocked=false;
+let lastSaved=JSON.stringify(data);
+try{
+  const raw=localStorage.getItem(KEY);
+  if(raw!==null){
+    const p=JSON.parse(raw);
+    if(!p||!['partners','captadores','costs'].every(k=>Array.isArray(p[k])))throw Error('Formato de dados inválido');
+    data=p;
+    lastSaved=raw;
+  }
+}catch(e){
+  storageBlocked=true;
+  console.error('AUREON-BRINDES: dados originais preservados.',e);
+  alert('Não foi possível ler os dados salvos. Alterações bloqueadas para evitar perda de registros.');
+}
+const save=()=>{
+  if(storageBlocked){
+    alert('Salvamento bloqueado: os dados existentes não puderam ser lidos.');
+    return false;
+  }
+  try{
+    const next=JSON.stringify(data);
+    localStorage.setItem(KEY,next);
+    lastSaved=next;
+    render();
+    toast('Registro salvo neste dispositivo');
+    return true;
+  }catch(e){
+    console.error('AUREON-BRINDES: gravação não concluída.',e);
+    data=JSON.parse(lastSaved);
+    render();
+    alert('Não foi possível salvar. A alteração foi desfeita para preservar os dados anteriores.');
+    return false;
+  }
+};
 const toast=s=>{const t=$('toast');t.textContent=s;t.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.style.display='none',2800)};
 const seedRows=[
 ['2026-07','ARMAZEM BRASIL',1,1,15000],['2026-07','DINO',491,201,4123909],['2026-07','ESPELHOS DO JORDÃO',40,14,200000],['2026-07','MINILAND CAMPOS',111,42,932289],['2026-07','MUSEU DE CERA',894,371,7508706],['2026-07','POSTO SCOFANO',37,33,437000],['2026-07','RB SOUVENIRES',24,21,327000],['2026-07','ROSTIE RESTAURANTE',41,31,463000],['2026-07','SHARE WEEK',124,72,0],['2026-07','SPINASSI',26,24,276000],
@@ -187,7 +220,8 @@ if(!cap){cap={id:newId(),name:c.cap,team:'OUTRA'};data.captadores.push(cap)}
 data.costs.push({id:c.id,date:c.date,partnerId:p.id,captadorId:cap.id,category:p.category||'Outros',description:(c.variant||'Brinde TSExplorer')+(c.location?' • Local: '+c.location:''),qty:c.qty,unit:Math.round(c.val/c.qty*100000)/100000,status:'pendente',source:'TSExplorer',variant:c.variant,totalOriginal:c.val,couple:c.couple,sale:c.sale,cancelled:c.cancelled});
 existing.add(c.id);added++;
 }
-if(added)save();else render();
+if(added&&!save())throw Error('Os novos registros não foram gravados; a importação foi desfeita');
+if(!added)render();
 $('month').value='';render();alert('Importação concluída! '+added+' brindes adicionados; '+(parsed.length-added)+' já importados; '+failures+' itens não interpretados; '+skipped+' atendimentos sem brinde ou inválidos.\nImportante: status financeiro importado como PENDENTE por falta de confirmação de pagamento. Confira os valores antes de realizar fechamento. Nenhum dado pessoal dos casais foi importado.');
 }catch(err){alert('Falha ao importar CSV: '+err.message)}
 e.target.value='';
