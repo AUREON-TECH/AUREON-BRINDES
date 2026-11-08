@@ -210,7 +210,12 @@ const sold=Number((r[col('Valor vendido')]||'0').replace(/\./g,'').replace(',','
 }
 }
 if(!parsed.length)throw Error('Nenhum brinde válido encontrado.');
-if(parsed.length<100&&rows.length>1000)throw Error('Poucos brindes foram lidos. Verifique se o arquivo é o TSExplorer completo.');const existing=new Set(data.costs.map(x=>x.id));let added=0;
+if(parsed.length<100&&rows.length>1000)throw Error('Poucos brindes foram lidos. Verifique se o arquivo é o TSExplorer completo.');const existingTS=data.costs.filter(x=>x.source==='TSExplorer');
+if(existingTS.length){
+const notice='ATENÇÃO: já existem '+existingTS.length+' brindes importados do TSExplorer neste navegador. A identificação atual depende da posição das linhas do CSV; um arquivo reordenado pode DUPLICAR custos, casais e vendas.\n\nPor segurança, faça um backup JSON antes de continuar. Cancele se este CSV for uma reexportação de dados já importados.\n\nDeseja continuar mesmo assim?';
+if(!confirm(notice)){alert('Importação cancelada. Nenhum registro foi alterado.');e.target.value='';return;}
+}
+const existing=new Set(data.costs.map(x=>x.id));let added=0;
 for(const c of parsed){
 if(existing.has(c.id))continue;
 let p=data.partners.find(x=>x.name.toUpperCase()===c.name.toUpperCase());
